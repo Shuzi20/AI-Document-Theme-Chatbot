@@ -3,18 +3,21 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
-from langchain_qdrant import Qdrant
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
 from groq import Groq
 import os
 from dotenv import load_dotenv
 
+# ✅ RECOMMENDED: New import path (if you’ve run: pip install -U langchain-huggingface)
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# ✅ Updated Qdrant import alias
+from langchain_community.vectorstores import Qdrant as QdrantStore
+
 # 🔐 Load environment variables
 load_dotenv()
 
-# ✅ Check Groq API key
 if os.getenv("GROQ_API_KEY"):
     print("✅ Groq key loaded.")
 else:
@@ -41,7 +44,8 @@ class QueryResponse(BaseModel):
 embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 qdrant_client = QdrantClient(host="localhost", port=6333)
 
-qdrant = Qdrant(
+# ✅ Connect LangChain to Qdrant correctly
+qdrant = QdrantStore(
     client=qdrant_client,
     collection_name="documents_collection",
     embeddings=embedding_model
@@ -53,8 +57,12 @@ groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 @router.post("/ask", response_model=QueryResponse)
 def ask_question(payload: QueryRequest):
     try:
-        # Step 1: Vector similarity search
+        # 🔍 Step 1: Similarity search
         results = qdrant.similarity_search_with_score(payload.question, k=payload.top_k)
+        print(f"[DEBUG] Retrieved {len(results)} chunks for query: {payload.question}")
+
+        if not results:
+            return QueryResponse(top_chunks=[], theme_summary="No relevant information found.")
 
         top_chunks = [
             RetrievedChunk(
@@ -64,15 +72,19 @@ def ask_question(payload: QueryRequest):
             ) for doc, score in results
         ]
 
-        # Step 2: Format input for summarization
-        docs_for_summary = [f"[{d.metadata['doc_name']}, Page {d.metadata.get('page')}] {d.text}" for d in top_chunks]
+        # 🔎 Step 2: Format input for summarization
+        docs_for_summary = [
+            f"[{d.metadata['doc_name']}, Page {d.metadata.get('page')}] {d.text}"
+            for d in top_chunks
+        ]
 
         summary_prompt = (
-            "You are a helpful AI assistant. Analyze the following excerpts from multiple documents and identify 1–3 key themes. Group supporting citations and explain them clearly.\n\n"
+            "You are a helpful AI assistant. Analyze the following excerpts from multiple documents "
+            "and identify 1–3 key themes. Group supporting citations and explain them clearly.\n\n"
             + "\n\n".join(docs_for_summary)
         )
 
-        # Step 3: Summarize using Groq + LLaMA 3
+        # 🤖 Step 3: Summarize using Groq + LLaMA 3
         response = groq_client.chat.completions.create(
             model="llama3-8b-8192",
             messages=[
@@ -87,4 +99,6 @@ def ask_question(payload: QueryRequest):
         return QueryResponse(top_chunks=top_chunks, theme_summary=theme_summary)
 
     except Exception as e:
+        import traceback
+        print("[ERROR]", traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))

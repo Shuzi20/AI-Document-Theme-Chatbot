@@ -35,14 +35,13 @@ def create_qdrant_collection():
 def process_and_store_text(document_name, text_by_page):
     create_qdrant_collection()
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50
-    )
-
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     documents = []
+
     for page, text in text_by_page.items():
+        print(f"[DEBUG] Splitting text from {document_name} - {page}")
         chunks = splitter.split_text(text)
+        print(f"[DEBUG] {len(chunks)} chunks from {page}")
         for idx, chunk in enumerate(chunks):
             documents.append({
                 "id": str(uuid.uuid4()),
@@ -53,6 +52,12 @@ def process_and_store_text(document_name, text_by_page):
                     "chunk_index": idx
                 }
             })
+
+    print(f"[DEBUG] Total chunks to store: {len(documents)}")
+    
+    if not documents:
+        print("[WARNING] No chunks created. Possible OCR failure or empty document.")
+        return 0
 
     # Store in Qdrant via LangChain
     langchain_docs = [
@@ -67,6 +72,5 @@ def process_and_store_text(document_name, text_by_page):
         url=f"http://{QDRANT_HOST}:{QDRANT_PORT}"
     )
 
-    return len(documents)
-# Example call:
-# process_and_store_text("wasserstoff_task.pdf", {"page_1": "Text here...", "page_2": "More text..."})
+    print(f"[DEBUG] Stored {len(langchain_docs)} chunks into Qdrant.")
+    return len(langchain_docs)

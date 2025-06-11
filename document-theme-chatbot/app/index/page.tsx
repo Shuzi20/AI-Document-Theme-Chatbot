@@ -25,23 +25,36 @@ export default function HomePage() {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
+    if (!e.target.files?.length) {
+      console.warn("No files selected.");
+      return;
+    }
 
     const formData = new FormData();
 
-    // ✅ Append all files under the key 'files'
     Array.from(e.target.files).forEach((file) => {
-      formData.append('files', file); 
+      console.log("[UPLOAD] Selected:", file.name);
+      formData.append('files', file); // ✅ key must match backend
     });
 
-    const res = await fetch('http://localhost:8000/upload/', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const res = await fetch('http://localhost:8000/upload/', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const result = await res.json();
-    console.log('Upload result:', result);
+      if (!res.ok) {
+        console.error("[UPLOAD] Server returned error:", res.statusText);
+        return;
+      }
+
+      const result = await res.json();
+      console.log('[UPLOAD] Success:', result);
+    } catch (error) {
+      console.error("[UPLOAD] Failed:", error);
+    }
   };
+
 
 
   return (
@@ -104,12 +117,17 @@ export default function HomePage() {
                 <CardContent className="p-4 space-y-2">
                   <p className="font-semibold">📚 Top Chunks:</p>
                   <ul className="list-disc ml-6 text-sm">
-                    {res.top_chunks.map((c: any, i: number) => (
-                      <li key={i}>
-                        <strong>{c.metadata.doc_name}, Page {c.metadata.page}:</strong> {c.text}
-                      </li>
-                    ))}
+                    {Array.isArray(res.top_chunks) && res.top_chunks.length > 0 ? (
+                      res.top_chunks.map((c: any, i: number) => (
+                        <li key={i}>
+                          <strong>{c.metadata.doc_name}, Page {c.metadata.page}:</strong> {c.text}
+                        </li>
+                      ))
+                    ) : (
+                      <li className="text-gray-500 italic">No relevant document chunks found for this query.</li>
+                    )}
                   </ul>
+
                   <p className="font-semibold">🧠 Theme Summary:</p>
                   <p className="text-sm whitespace-pre-wrap">{res.theme_summary}</p>
                 </CardContent>
@@ -120,18 +138,20 @@ export default function HomePage() {
 
         {/* Fixed Input Bar at Bottom of Chat Panel */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t p-4 flex items-center gap-2">
+          {/* This label triggers the hidden file input via htmlFor */}
           <label htmlFor="upload" className="cursor-pointer">
             <Upload className="h-5 w-5 text-gray-500" />
           </label>
+
+          {/* ✅ Connect this input with the label above using the same id */}
           <input
-            id="upload"
+            id="upload" // <-- Required so label can trigger this
             type="file"
             multiple
-            // @ts-ignore: webkitdirectory is non-standard but supported in browsers
-            webkitdirectory="true"
             onChange={handleUpload}
             className="hidden"
           />
+
           <Input
             placeholder="Ask your question..."
             value={question}

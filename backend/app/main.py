@@ -1,10 +1,11 @@
 from typing import List
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.text_extractor import extract_text_from_file
-from app.services.embedding_pipeline import process_and_store_text
+from app.services.embedding_pipeline import process_and_store_text, create_qdrant_collection
 from app.api import query
-from fastapi import Request
+from app.api import documents
+import re  # ✅ Needed for better page parsing
 
 app = FastAPI()
 
@@ -18,24 +19,26 @@ app.add_middleware(
 )
 
 @app.post("/upload/")
-async def upload_files(request: Request):
-    form = await request.form()
-    files = [v for v in form.values() if isinstance(v, UploadFile)]
-    
-
-    results = []
+async def upload_files(files: List[UploadFile] = File(...)):
     print(f"Received {len(files)} files")
+    results = []
+
     for file in files:
         contents = await file.read()
         text, meta = extract_text_from_file(file.filename, contents)
 
+        print(f"[DEBUG] Raw extracted text length: {len(text)}")
+
+        # ✅ Better page splitting logic
+        import re
+        pages = re.findall(r"\[Page (\d+)]\n(.*?)(?=\n\[Page \d+]|\Z)", text, re.DOTALL)
         text_by_page = {}
-        for line in text.split('\n\n'):
-            if line.strip().startswith('[Page'):
-                parts = line.strip().split(']\n', 1)
-                if len(parts) == 2:
-                    page_label = "page_" + parts[0].split('Page')[-1].strip()
-                    text_by_page[page_label] = parts[1]
+
+        for page_num, page_text in pages:
+            label = f"page_{page_num}"
+            cleaned = page_text.strip()
+            text_by_page[label] = cleaned
+            print(f"[DEBUG] Extracted {len(cleaned)} characters from {label}")
 
         chunks_stored = process_and_store_text(file.filename, text_by_page)
 
@@ -47,6 +50,10 @@ async def upload_files(request: Request):
 
     return {"uploaded": results}
 
+@app.on_event("startup")
+def startup_event():
+    create_qdrant_collection()
+
 @app.get("/test-embedding")
 def test_embedding():
     text_by_page = {
@@ -56,4 +63,6 @@ def test_embedding():
     num_chunks = process_and_store_text("test_doc.pdf", text_by_page)
     return {"status": "success", "chunks_stored": num_chunks}
 
+# Include routes
 app.include_router(query.router)
+app.include_router(documents.router)
