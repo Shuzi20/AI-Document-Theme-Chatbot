@@ -49,9 +49,10 @@ def process_and_store_text(document_name, text_by_page):
                 "metadata": {
                     "doc_name": document_name,
                     "page": page,
-                    "chunk_index": idx
+                    "chunk_index": idx  # ➕ Add this!
                 }
             })
+
 
     print(f"[DEBUG] Total chunks to store: {len(documents)}")
     
