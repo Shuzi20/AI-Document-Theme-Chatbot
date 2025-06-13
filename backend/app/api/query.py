@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Literal
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
-from qdrant_client.models import Filter, FieldCondition, MatchValue
 from groq import Groq
 import os
 from dotenv import load_dotenv
@@ -13,8 +12,8 @@ from datetime import datetime
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Qdrant as QdrantStore
+from app.api.query_filters import build_query_filter  # ✅ <-- imported here
 
-# 🔐 Load environment
 load_dotenv()
 
 router = APIRouter()
@@ -34,33 +33,38 @@ class QueryRequest(BaseModel):
     question: str
     top_k: int = 100
     excluded_docs: List[str] = []
+    sort_by: Literal["relevance", "newest", "oldest"] = "relevance"
+    doc_type: str = None
+    date_after: str = None  # ISO format (e.g., "2025-06-01")
+    date_before: str = None
 
 @router.post("/ask")
 def ask_question(payload: QueryRequest):
     try:
-        # Filter logic for excluded docs
-        filter_conditions = None
-        if payload.excluded_docs:
-            filter_conditions = Filter(
-                must_not=[
-                    FieldCondition(
-                        key="metadata.doc_name",
-                        match=MatchValue(value=doc)
-                    ) for doc in payload.excluded_docs
-                ]
-            )
-
-        # Vector search
-        raw_results = qdrant.similarity_search_with_score(
-            payload.question,
-            k=payload.top_k,
-            filter=filter_conditions
+        # ✅ Build advanced filters
+        filter_conditions = build_query_filter(
+            excluded_docs=payload.excluded_docs,
+            doc_type=payload.doc_type,
+            date_after=payload.date_after,
+            date_before=payload.date_before
         )
 
-        results = [r for r in raw_results if r[1] > 0.3]
-        print(f"[DEBUG] Filtered to {len(results)} relevant chunks")
+        embedded_query = embedding_model.embed_query(payload.question)
 
-        if not results:
+        search_result = qdrant_client.search(
+            collection_name="documents_collection",
+            query_vector=embedded_query,
+            limit=payload.top_k,
+            score_threshold=0.3,
+            with_payload=True,
+            query_filter=filter_conditions
+        )
+
+        for r in search_result:
+            print("[DEBUG] Payload sample:", r.payload)
+        print(f"[DEBUG] Retrieved {len(search_result)} results after filtering")
+
+        if not search_result:
             return {
                 "chat_id": str(uuid4()),
                 "timestamp": datetime.utcnow().isoformat(),
@@ -69,14 +73,29 @@ def ask_question(payload: QueryRequest):
                 "theme_summary": "No relevant information found."
             }
 
-        # Map doc_name → display ID
-        unique_docs = sorted({doc.metadata["doc_name"] for doc, _ in results})
+        raw_results = [
+            (
+                Document(
+                    page_content=hit.payload.get("page_content", ""),
+                    metadata=hit.payload.get("metadata", {})
+                ),
+                hit.score
+            )
+            for hit in search_result
+        ]
+
+        if payload.sort_by == "newest":
+            raw_results.sort(key=lambda r: r[0].metadata.get("uploaded_at", ""), reverse=True)
+        elif payload.sort_by == "oldest":
+            raw_results.sort(key=lambda r: r[0].metadata.get("uploaded_at", ""))
+
+        unique_docs = sorted({doc.metadata["doc_name"] for doc, _ in raw_results})
         doc_id_map = {name: f"DOC{str(i+1).zfill(3)}" for i, name in enumerate(unique_docs)}
 
         doc_map = {}
         top_chunks = []
 
-        for doc, score in results:
+        for doc, score in raw_results:
             doc_name = doc.metadata["doc_name"]
             page = doc.metadata.get("page", "N/A").replace("page_", "")
             chunk = doc.metadata.get("chunk_index", "?")
@@ -98,19 +117,35 @@ def ask_question(payload: QueryRequest):
                 "text": doc.page_content
             })
 
-        # Token-limited theme summary
         encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
         MAX_TOKENS = 4800
         total_tokens = 0
         final_chunks = []
 
         for chunk in top_chunks:
+            if not chunk.get("text") or not chunk["text"].strip():
+                print("[SKIP] Empty or invalid chunk:", chunk)
+                continue
+
             formatted = f"[{chunk['doc_id']}, Page {chunk['page']}, Chunk {chunk['chunk_index']}] {chunk['text']}"
             token_count = len(encoding.encode(formatted))
+
             if total_tokens + token_count > MAX_TOKENS:
                 break
+
             final_chunks.append(formatted)
             total_tokens += token_count
+
+        print(f"[DEBUG] Final chunks for theme summary: {len(final_chunks)}")
+
+        if not final_chunks:
+            return {
+                "chat_id": str(uuid4()),
+                "timestamp": datetime.utcnow().isoformat(),
+                "question": payload.question,
+                "document_answers": list(doc_map.values()),
+                "theme_summary": "⚠️ No valid excerpts found to generate themes."
+            }
 
         summary_prompt = (
             "You are a helpful AI assistant. Analyze the following excerpts from multiple documents "
@@ -132,13 +167,8 @@ def ask_question(payload: QueryRequest):
             "timestamp": datetime.utcnow().isoformat(),
             "question": payload.question,
             "document_answers": list(doc_map.values()),
-            "theme_summary": response.choices[0].message.content,
-            "matched_docs": [
-                {"doc_id": doc_id, "doc_name": doc_name}
-                for doc_name, doc_id in doc_id_map.items()
-            ]
+            "theme_summary": response.choices[0].message.content
         }
-
 
     except Exception as e:
         import traceback

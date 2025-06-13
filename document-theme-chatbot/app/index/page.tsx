@@ -15,6 +15,12 @@ export default function HomePage() {
   const [modalContent, setModalContent] = useState<{ title: string; text: string } | null>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [matchedDocs, setMatchedDocs] = useState<{ doc_id: string; doc_name: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [loadingAnswer, setLoadingAnswer] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [sortBy, setSortBy] = useState("relevance");
+
+
 
   //  Moved outside so it's globally usable
   const fetchDocs = async () => {
@@ -40,33 +46,37 @@ export default function HomePage() {
   const handleAsk = async () => {
     if (!question.trim()) return;
 
+    setLoadingAnswer(true);
     try {
       const res = await fetch('http://localhost:8000/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question,
-          excluded_docs: excludeMode ? excludedDocs : [],
+          excluded_docs: excludedDocs.map((d) => d.trim().toLowerCase()),
+          sort_by: "relevance",
         }),
       });
 
       const data = await res.json();
+      if (!res.ok || !data.document_answers) {
+        alert("⚠️ Something went wrong while fetching results.");
+        return;
+      }
 
-      // ✅ Extract unique doc_id + doc_name pairs
       const matchedDocsSet = new Map<string, { doc_id: string; doc_name: string }>();
-      (data.document_answers as any[]).forEach((d) => {
+      data.document_answers.forEach((d: any) => {
         matchedDocsSet.set(d.doc_id, { doc_id: d.doc_id, doc_name: d.doc_name });
       });
       setMatchedDocs(Array.from(matchedDocsSet.values()));
-
-      // ✅ Update chat state and reset input
       setResponses([...responses, { question, ...data }]);
       setQuestion('');
     } catch (error) {
-      console.error("Failed to get response:", error);
+      alert("🚨 Network error while trying to ask question.");
+    } finally {
+      setLoadingAnswer(false);
     }
   };
-
 
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,24 +87,35 @@ export default function HomePage() {
       formData.append('files', file);
     });
 
+    setUploading(true);
     try {
       const res = await fetch('http://localhost:8000/upload/', {
         method: 'POST',
         body: formData,
       });
 
-      if (!res.ok) return;
-      await fetchDocs(); // ✅ this now works
+      if (res.ok) {
+        setUploadSuccess(true);
+        setTimeout(() => setUploadSuccess(false), 2000);
+        await fetchDocs();
+      }
     } catch (error) {
       console.error("Upload failed:", error);
+    } finally {
+      setUploading(false);
     }
   };
 
+
   const toggleExcluded = (doc: string) => {
+    const normalized = doc.trim().toLowerCase();
     setExcludedDocs((prev) =>
-      prev.includes(doc) ? prev.filter((d) => d !== doc) : [...prev, doc]
+      prev.includes(normalized)
+        ? prev.filter((d) => d !== normalized)
+        : [...prev, normalized]
     );
   };
+
 
   const openChunkModal = (doc: string, page: string, chunk: string, text: string) => {
     setModalContent({
@@ -105,6 +126,18 @@ export default function HomePage() {
   
 
   return (
+    <>
+      {uploading && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-100 text-yellow-800 px-4 py-2 rounded shadow z-50">
+          ⏳ Uploading document(s)...
+        </div>
+      )}
+
+      {uploadSuccess && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-100 text-green-800 px-4 py-2 rounded shadow z-50">
+          ✅ Upload successful!
+        </div>
+      )}
     <div className="flex h-screen">
       {/* Sidebar */}
       <div className="w-64 bg-gray-100 p-4 border-r overflow-y-auto">
@@ -114,10 +147,6 @@ export default function HomePage() {
           <div>
             <label className="font-medium block mb-1">Date</label>
             <input type="date" className="w-full px-2 py-1 border rounded" />
-          </div>
-          <div>
-            <label className="font-medium block mb-1">Author</label>
-            <input type="text" placeholder="Enter author" className="w-full px-2 py-1 border rounded" />
           </div>
           <div>
             <label className="font-medium block mb-1">Document Type</label>
@@ -130,47 +159,77 @@ export default function HomePage() {
           </div>
           <div>
             <label className="font-medium block mb-1">Sort By</label>
-            <select className="w-full px-2 py-1 border rounded">
-              <option>Relevance</option>
-              <option>Newest</option>
-              <option>Oldest</option>
+            <select
+              className="w-full px-2 py-1 border rounded"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value.toLowerCase())}
+            >
+              <option value="relevance">Relevance</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              id="exclude"
-              className="accent-black"
-              checked={excludeMode}
-              onChange={(e) => setExcludeMode(e.target.checked)}
-            />
-            <label htmlFor="exclude">Exclude specific documents</label>
-          </div>
+          {/* 📋 Always-visible exclusion checklist */}
+          <div>
+            <h3 className="font-semibold mt-3">Exclude Documents:</h3>
 
-          {excludeMode && (
-            <div>
-              <h3 className="font-semibold mt-3">Docs to Exclude:</h3>
-              <ul className="mt-1 space-y-1 text-sm max-h-40 overflow-y-auto pr-1">
-                {documents.map((doc, i) => (
+            {/* Bulk Controls */}
+            <div className="flex justify-between text-xs text-gray-600 mb-1">
+              <button
+                className="text-blue-600 underline"
+                onClick={() =>
+                  setExcludedDocs(
+                    (matchedDocs.length > 0
+                      ? matchedDocs.map((d) => d.doc_name)
+                      : documents)
+                  )
+                }
+              >
+                Exclude All
+              </button>
+              <button
+                className="text-blue-600 underline"
+                onClick={() => setExcludedDocs([])}
+              >
+                Include All
+              </button>
+            </div>
+            
+            <ul className="space-y-1 text-sm max-h-40 overflow-y-auto pr-1">
+              {(matchedDocs.length > 0 ? matchedDocs : documents.map((doc) => ({ doc_name: doc })))
+                .sort((a, b) => a.doc_name.localeCompare(b.doc_name))
+                .map((doc, i) => (
                   <li key={i}>
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={excludedDocs.includes(doc)}
-                        onChange={() => toggleExcluded(doc)}
+                        checked={excludedDocs.includes(doc.doc_name)}
+                        onChange={() => toggleExcluded(doc.doc_name)}
                         className="accent-black"
                       />
-                      <span className="truncate" title={doc}>{doc}</span>
+                      <span
+                        className={`truncate ${
+                          excludedDocs.includes(doc.doc_name) ? 'text-gray-400 line-through' : ''
+                        }`}
+                        title={doc.doc_name}
+                      >
+                        {doc.doc_name}
+                      </span>
                     </label>
                   </li>
                 ))}
-              </ul>
-            </div>
-          )}
+            </ul>
 
+            {excludedDocs.length > 0 && (
+              <div className="mt-2 text-xs text-gray-600">
+                Excluding {excludedDocs.length} document{excludedDocs.length > 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
 
       {/* Main Panel */}
       <div className="flex-1 relative flex flex-col">
@@ -218,14 +277,14 @@ export default function HomePage() {
                     </table>
                   </div>
 
-                  {/* 🧠 Theme Summary */}
+                 {/* 🧠 Theme Summary */}
                   <p className="font-semibold pt-4">🧠 Synthesized Answer (Themes):</p>
                   <p className="text-sm whitespace-pre-wrap">
                     {res.theme_summary.split(/(\[.*?\])/).map((part: string, i: number) => {
                       const match = part.match(/\[(.*?), Page (.*?), Chunk (.*?)\]/);
                       if (match) {
                         const [_, doc, page, chunk] = match;
-                        const chunkMatch = res.document_answers.find(
+                        const chunkMatch = res.document_answers?.find(
                           (c: any) =>
                             c.doc_id === doc &&
                             c.citation.includes(`Page ${page}`) &&
@@ -239,6 +298,7 @@ export default function HomePage() {
                                 openChunkModal(doc, page, chunk, chunkMatch.answer);
                               }
                             }}
+                            title={`Click to view ${doc}, Page ${page}, Chunk ${chunk}`}
                             className="text-blue-600 underline hover:text-blue-800 mx-1"
                           >
                             {part}
@@ -250,20 +310,33 @@ export default function HomePage() {
                     })}
                   </p>
 
+                  {/* 🔁 Re-run Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => {
+                      setQuestion(res.question);
+                      handleAsk();  // Reuses current question + exclusion state
+                    }}
+                  >
+                    Re-run with current filters
+                  </Button>
+
                   {/* 📄 Matched Document Names */}
                   {res.document_answers?.length > 0 && (
                     <div className="mt-3 text-sm text-gray-700">
                       Matched documents from this query:
                       <ul className="list-disc ml-4 mt-1">
-                        {[...new Map(res.document_answers.map((doc: any) => [doc.doc_id, doc])).values()].map((doc: any, idx: number) => (
-                          <li key={idx}>
-                            <span className="font-medium">{doc.doc_id}</span> – {doc.doc_name}
-                          </li>
-                        ))}
+                        {[...new Map(res.document_answers.map((doc: any) => [doc.doc_id, doc])).values()]
+                          .map((doc: any, idx: number) => (
+                            <li key={idx}>
+                              <span className="font-medium">{doc.doc_id}</span> – {doc.doc_name}
+                            </li>
+                          ))}
                       </ul>
                     </div>
                   )}
-
 
                 </CardContent>
               </Card>
@@ -284,6 +357,7 @@ export default function HomePage() {
             onChange={handleUpload}
             className="hidden"
           />
+
           <Input
             placeholder="Ask your question..."
             value={question}
@@ -296,8 +370,23 @@ export default function HomePage() {
             }}
             className="flex-1"
           />
+
           <Button onClick={handleAsk}>Ask</Button>
+
+          {/* ✅ Clear Chat Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600 border-red-600 hover:bg-red-50"
+            onClick={() => {
+              setResponses([]);
+              localStorage.removeItem('chatHistory');
+            }}
+          >
+            Clear
+          </Button>
         </div>
+
       </div>
 
       {/* 🔍 Modal Viewer */}
@@ -315,5 +404,6 @@ export default function HomePage() {
         </div>
       )}
     </div>
+    </>
   );
 }

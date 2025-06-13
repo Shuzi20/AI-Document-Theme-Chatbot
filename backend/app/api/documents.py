@@ -36,3 +36,19 @@ def list_uploaded_documents():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/debug/qdrant-payloads")
+def debug_payloads():
+    scroll_result = qdrant_client.scroll(
+        collection_name="documents_collection",
+        limit=20,
+        with_payload=True
+    )
+    return [
+        {
+            "id": point.id,
+            "payload": point.payload
+        }
+        for point in scroll_result[0]
+    ]
