@@ -14,24 +14,29 @@ from qdrant_client.models import Distance, VectorParams
 QDRANT_HOST = os.getenv("QDRANT_HOST")  # e.g. https://your-cluster.aws.cloud.qdrant.io
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents_collection")
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # public cloud-safe model
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # small and cloud-safe
 
-# ✅ Initialize embedding model
-embedding_model = HuggingFaceEmbeddings(model_name=MODEL_NAME)
+# ✅ Lazy-loaded embedding model
+def get_embedding_model():
+    return HuggingFaceEmbeddings(model_name=MODEL_NAME)
 
-# ✅ Initialize Qdrant Cloud Client with API Key
-qdrant_client = QdrantClient(
-    url=QDRANT_HOST,
-    api_key=QDRANT_API_KEY
-)
+# ✅ Lazy-loaded Qdrant client
+def get_qdrant_client():
+    return QdrantClient(
+        url=QDRANT_HOST,
+        api_key=QDRANT_API_KEY
+    )
 
 # ✅ Create collection if it doesn’t exist
 def create_qdrant_collection():
-    if COLLECTION_NAME not in [c.name for c in qdrant_client.get_collections().collections]:
-        qdrant_client.create_collection(
+    client = get_qdrant_client()
+    model = get_embedding_model()
+
+    if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:
+        client.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(
-                size=len(embedding_model.embed_query("test")),
+                size=len(model.embed_query("test")),
                 distance=Distance.COSINE
             )
         )
@@ -49,6 +54,8 @@ def infer_doc_type(filename: str):
 
 # ✅ Full pipeline to process & embed document
 def process_and_store_text(document_name, text_by_page):
+    client = get_qdrant_client()
+    model = get_embedding_model()
     create_qdrant_collection()
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
@@ -91,9 +98,9 @@ def process_and_store_text(document_name, text_by_page):
     # ✅ Store documents in Qdrant Cloud
     Qdrant.from_documents(
         documents=langchain_docs,
-        embedding=embedding_model,
+        embedding=model,
         collection_name=COLLECTION_NAME,
-        client=qdrant_client
+        client=client
     )
 
     print(f"[DEBUG] Stored {len(langchain_docs)} chunks into Qdrant.")

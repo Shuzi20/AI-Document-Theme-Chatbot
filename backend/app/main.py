@@ -2,7 +2,7 @@ from typing import List
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.text_extractor import extract_text_from_file
-from app.services.embedding_pipeline import process_and_store_text, create_qdrant_collection
+from app.services.embedding_pipeline import process_and_store_text
 from app.api import query
 from app.api import documents
 from fastapi.responses import HTMLResponse
@@ -13,7 +13,7 @@ app = FastAPI()
 # ✅ Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000"],  # Update this if deployed frontend uses a different domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,9 +52,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
 
     return {"uploaded": results}
 
-@app.on_event("startup")
-def startup_event():
-    create_qdrant_collection()
+# ❌ Removed create_qdrant_collection() from startup to reduce memory usage
 
 @app.get("/test-embedding")
 def test_embedding():
@@ -65,11 +63,14 @@ def test_embedding():
     num_chunks = process_and_store_text("test_doc.pdf", text_by_page)
     return {"status": "success", "chunks_stored": num_chunks}
 
+# ✅ Health check for Render
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
 
-#  Include main routers
+# ✅ Include main routers
 app.include_router(query.router)
 app.include_router(documents.router)
-
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
