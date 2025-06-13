@@ -23,8 +23,7 @@ Pillow==10.3.0
 # Tokenizer
 tiktoken==0.6.0
 
-# gRPC-related
-grpcio==1.64.0
+# gRPC tools
 grpcio-tools==1.73.0
 
 # Utility
