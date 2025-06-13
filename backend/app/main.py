@@ -5,6 +5,7 @@ from app.services.text_extractor import extract_text_from_file
 from app.services.embedding_pipeline import process_and_store_text, create_qdrant_collection
 from app.api import query
 from app.api import documents
+from fastapi.responses import HTMLResponse
 import re
 
 app = FastAPI()
@@ -63,6 +64,20 @@ def test_embedding():
     }
     num_chunks = process_and_store_text("test_doc.pdf", text_by_page)
     return {"status": "success", "chunks_stored": num_chunks}
+
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    return """
+    <html>
+        <head><title>Document Theme Chatbot</title></head>
+        <body style="font-family: sans-serif;">
+            <h2>🚀 Document Theme Chatbot Backend is Live!</h2>
+            <p>This FastAPI backend is now running.</p>
+            <p>Use <code>/upload</code> or <code>/query</code> to interact with the API.</p>
+        </body>
+    </html>
+    """
+
 
 #  Include main routers
 app.include_router(query.router)
