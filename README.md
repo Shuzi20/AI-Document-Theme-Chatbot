@@ -1,139 +1,141 @@
-📚 Document Theme Chatbot – Wasserstoff Gen-AI Internship Task
-This project is a document research and theme identification chatbot built for the Wasserstoff Generative AI Internship Qualification Task. It allows users to upload documents (PDF, scanned images, text), ask questions in natural language, and receive cited answers and theme-based summaries using LLMs and vector search.
+# 📚 Document Theme Chatbot – Wasserstoff Gen-AI Internship Task
 
-🔍 Features
-✅ Core Functionality
-Upload 75+ documents (PDFs, scans, text)
+This project is a **Document Research and Theme Identification Chatbot** built as part of the **Wasserstoff Generative AI Internship Qualification Task**. It enables users to upload a wide range of documents (PDFs, text, scanned images), ask natural language questions, and receive document-cited answers and theme-based summaries using LLMs and vector search.
 
-OCR support for scanned image PDFs using PyMuPDF + optional fallback
+---
 
-Chunking + Embedding with LangChain + MiniLM and storage in Qdrant
+## 🔍 Features
 
-Ask natural questions – semantic search returns relevant text chunks
+### ✅ Core Functionality
 
-Document-level answers – with citations (Document ID, Page, Chunk)
+- Upload **75+ documents** (PDF, scans, text)
+- **OCR support** for scanned PDFs using PyMuPDF
+- Chunking + embedding using **LangChain + MiniLM**
+- Vector storage in **Qdrant**
+- **Semantic search** to retrieve top matching document chunks
+- Answers include:
+  - **Document ID**
+  - **Page number**
+  - **Chunk number**
+- Theme-based summarization using **Groq + LLaMA 3**
+- Advanced filtering:
+  - **By date**
+  - **By document type**
+  - **By inclusion/exclusion**
+  - **Sort by relevance/newest/oldest**
 
-Theme-based summarization – synthesized LLM summary grouped by theme
+---
 
-Filters: by date, document type, exclusion list, sort order
+### 🎯 Extra Credit Implemented
 
-🎯 Extra Credit Implemented
-✅ Paragraph/Chunk-level citation (e.g., Page 3, Chunk 2)
+- ✅ **Paragraph/Chunk-level citations** (e.g., *Page 3, Chunk 2*)
+- ✅ **Clickable citations** inside chat that show chunk modal
+- ✅ **Filter sidebar** shows only matched documents
+- ✅ **Re-run** query on selected subset of docs
+- ✅ Sidebar filters: exclude, sort, type, date
+- ✅ Modern UI features:
+  - Upload & loading states
+  - **Clear Chat** option
+  - **Chat history persisted** in localStorage
+  - Chat-style flow with **latest message near input**, like ChatGPT
 
-✅ Clickable citations in chat (modal view)
+---
 
-✅ Filter by matched docs only
+## 🧠 Tech Stack
 
-✅ Re-run query on selected subset of docs
+| Layer     | Tooling                       |
+|-----------|-------------------------------|
+| Frontend  | Next.js 14, Tailwind CSS      |
+| Backend   | FastAPI                       |
+| LLM       | Groq API + LLaMA 3 (8B)       |
+| Embedding | HuggingFace `all-MiniLM-L6-v2`|
+| Vector DB | Qdrant                        |
+| OCR       | PyMuPDF (fitz)                |
+| Deployment| (Local Dev) – HuggingFace, Render, Railway supported |
 
-✅ Sidebar filters: exclude, sort by relevance/date
+---
 
-✅ Modern assistant-style chat UI with:
+## 🧪 How It Works
 
-Upload & loading states
+### 🔹 Document Upload
+- Extract text from each page (OCR if needed)
+- Split into overlapping chunks
+- Embed using `MiniLM`
+- Store in Qdrant with metadata:
+  - doc_name, page, chunk_index, uploaded_at
 
-Clear chat option
+### 🔹 Asking a Question
+- Embed user question
+- Search top-k relevant chunks in Qdrant
+- Return each with doc ID, page, chunk
+- Generate LLM summary using Groq LLaMA-3
 
-LocalStorage chat history
+### 🔹 Frontend Display
+- Shows document answer table
+- Synthesized theme summary
+- Clickable references to exact chunks
+- Filter sidebar allows re-querying with refined criteria
 
-Newest message appears near input bar (like ChatGPT)
+---
 
-🧠 Tech Stack
-Layer	Tooling
-Frontend	Next.js 14 + Tailwind CSS
-Backend	FastAPI
-LLM	Groq + LLaMA 3 (8B)
-Embeddings	HuggingFace MiniLM
-Vector DB	Qdrant
-OCR	PyMuPDF (fitz)
-Deployment	(Local Dev) – Easily deployable on Hugging Face, Render, Railway
+## 📦 Project Structure
 
-🧪 How It Works
-Document Upload
 
-Extracts text from each page.
-
-Splits into overlapping chunks.
-
-Embeds using HuggingFace MiniLM.
-
-Stores with metadata in Qdrant.
-
-Asking a Question
-
-Question is embedded and searched in Qdrant.
-
-Top-k chunks are retrieved (filtered by user criteria).
-
-Each chunk is cited (DOC ID, Page, Chunk).
-
-A Groq LLaMA-3 model summarizes the top chunks into themes.
-
-Frontend Display
-
-Shows individual document answers (tabular).
-
-Theme summary in chat format.
-
-Clickable citation links to view source chunk.
-
-Sidebar filters and exclusions applied dynamically.
-
-📦 Project Structure
-mathematica
-Copy
-Edit
 chatbot-theme-identifier/
 ├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── query.py         ← Main QA logic
-│   │   │   ├── query_filters.py ← Filtering logic
-│   │   │   └── documents.py     ← List uploaded docs
-│   │   ├── services/
-│   │   │   ├── text_extractor.py
-│   │   │   └── embedding_pipeline.py
-│   │   └── main.py              ← FastAPI entrypoint
-├── frontend/ (Next.js project)
-│   └── app/index/page.tsx      ← Core UI
-├── data/                       ← Optional: sample docs
+│ ├── app/
+│ │ ├── api/
+│ │ │ ├── query.py ← Main QA logic
+│ │ │ ├── query_filters.py ← Filtering logic
+│ │ │ └── documents.py ← List uploaded docs
+│ │ ├── services/
+│ │ │ ├── text_extractor.py
+│ │ │ └── embedding_pipeline.py
+│ │ └── main.py ← FastAPI entrypoint
+├── frontend/ (Next.js 14)
+│ └── app/index/page.tsx ← Core Chat UI
+├── data/ ← Optional: test documents
 └── README.md
-🚀 Running Locally
-1. Clone + Install
-bash
-Copy
-Edit
+
+
+---
+
+## 🚀 Running Locally
+
+### 1️⃣ Clone & Install
+
+```bash
 git clone https://github.com/yourname/document-theme-chatbot
 cd document-theme-chatbot/backend
 pip install -r requirements.txt
-2. Start Backend
-bash
-Copy
-Edit
-# Start Qdrant
+
+2️⃣ Start Backend
+# Start Qdrant (requires Docker)
 docker run -p 6333:6333 -v $(pwd)/qdrant_storage:/qdrant/storage qdrant/qdrant
 
-# Start FastAPI
+# Start FastAPI server
 uvicorn app.main:app --reload
-3. Start Frontend (Next.js)
-bash
-Copy
-Edit
-cd frontend
+
+
+3️⃣ Start Frontend
+cd ../document-theme-chatbot
 npm install
 npm run dev
+
+App runs at http://localhost:3000 and connects to backend on http://localhost:8000
+
 🎥 Demo Preview
-📄 Upload documents
+📝 Upload documents
+Drag and drop PDFs or images (OCR supported)
 
-🧠 Ask “What is the main topic discussed?”
+💬 Ask a question
+Example: "What is the penalty mentioned in each compliance file?"
 
-📌 See:
+📊 See answers:
+Extracted text with DOC ID, Page, Chunk
 
-Per-document citations
+Synthesized themes grouped across documents
 
-Synthesized theme answers
+Filter results by type/date/exclusion
 
-Filter, re-run, clear history
-
-Document match map
-
+Click chunk references to read source
