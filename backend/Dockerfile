@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # --- Setup app directory ---
 WORKDIR /app
+ENV TRANSFORMERS_CACHE=/app/cache
 
 # --- Install Python dependencies ---
 COPY requirements.txt .
