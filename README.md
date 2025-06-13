@@ -1,6 +1,4 @@
-from pathlib import Path
 
-readme_text = """
 # 🧠 Document Theme Chatbot (Wasserstoff Gen-AI Internship Project)
 
 An AI-powered document research chatbot that lets you upload multiple documents, ask natural language questions, get document-wise answers with citations, and see synthesized themes across documents — all in a clean chat-style interface.
