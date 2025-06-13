@@ -1,3 +1,4 @@
+
 # 📚 Document Theme Chatbot – Wasserstoff Gen-AI Internship Task
 
 This project is a **Document Research and Theme Identification Chatbot** built as part of the **Wasserstoff Generative AI Internship Qualification Task**. It enables users to upload a wide range of documents (PDFs, text, scanned images), ask natural language questions, and receive document-cited answers and theme-based summaries using LLMs and vector search.
