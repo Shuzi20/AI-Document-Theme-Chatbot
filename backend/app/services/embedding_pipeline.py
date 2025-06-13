@@ -1,6 +1,4 @@
-# ✅ CHUNKING + EMBEDDING + QDRANT STORAGE (LangChain)
-
-# File: backend/app/services/embedding_pipeline.py
+# ✅ CHUNKING + EMBEDDING + QDRANT STORAGE (LangChain + Qdrant Cloud)
 
 import os
 import uuid
@@ -12,19 +10,22 @@ from langchain_community.vectorstores import Qdrant
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
-# 🔧 Configure Paths and Models
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-COLLECTION_NAME = "documents_collection"
-MODEL_NAME = "all-MiniLM-L6-v2"  # Fast + free local model
+# 🔧 Load from Environment Variables (Cloud-Safe)
+QDRANT_HOST = os.getenv("QDRANT_HOST")  # e.g. https://your-cluster.aws.cloud.qdrant.io
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents_collection")
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # public cloud-safe model
 
-# Load local embedding model
+# ✅ Initialize embedding model
 embedding_model = HuggingFaceEmbeddings(model_name=MODEL_NAME)
 
-# Initialize Qdrant client
-qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+# ✅ Initialize Qdrant Cloud Client with API Key
+qdrant_client = QdrantClient(
+    url=QDRANT_HOST,
+    api_key=QDRANT_API_KEY
+)
 
-# Create collection if not exists
+# ✅ Create collection if it doesn’t exist
 def create_qdrant_collection():
     if COLLECTION_NAME not in [c.name for c in qdrant_client.get_collections().collections]:
         qdrant_client.create_collection(
@@ -35,6 +36,7 @@ def create_qdrant_collection():
             )
         )
 
+# 🔍 Simple type inference from filename
 def infer_doc_type(filename: str):
     name = filename.lower()
     if "legal" in name:
@@ -45,7 +47,7 @@ def infer_doc_type(filename: str):
         return "policy"
     return "other"
 
-# Chunk, Embed, and Store Text in Qdrant
+# ✅ Full pipeline to process & embed document
 def process_and_store_text(document_name, text_by_page):
     create_qdrant_collection()
 
@@ -56,17 +58,16 @@ def process_and_store_text(document_name, text_by_page):
     flat_doc_name = document_name.strip().lower()
 
     for page, text in text_by_page.items():
-        print(f"[DEBUG] Splitting text from {document_name} - {page}")
+        print(f"[DEBUG] Splitting text from {document_name} - Page {page}")
         chunks = splitter.split_text(text)
-        print(f"[DEBUG] {len(chunks)} chunks from {page}")
+        print(f"[DEBUG] {len(chunks)} chunks from Page {page}")
         for idx, chunk in enumerate(chunks):
-            # Flatten doc_name into metadata for filter compatibility
             documents.append({
                 "id": str(uuid.uuid4()),
                 "text": chunk,
                 "metadata": {
                     "doc_name": flat_doc_name,
-                    "doc_type": infer_doc_type(flat_doc_name),  # ✅ NEW
+                    "doc_type": infer_doc_type(flat_doc_name),
                     "page": page,
                     "chunk_index": idx,
                     "uploaded_at": now
@@ -79,7 +80,6 @@ def process_and_store_text(document_name, text_by_page):
         print("[WARNING] No chunks created. Possible OCR failure or empty document.")
         return 0
 
-    # Convert to LangChain Document format
     langchain_docs = [
         Document(
             page_content=doc["text"],
@@ -88,12 +88,12 @@ def process_and_store_text(document_name, text_by_page):
         for doc in documents
     ]
 
-    # Store into Qdrant
+    # ✅ Store documents in Qdrant Cloud
     Qdrant.from_documents(
         documents=langchain_docs,
         embedding=embedding_model,
         collection_name=COLLECTION_NAME,
-        url=f"http://{QDRANT_HOST}:{QDRANT_PORT}"
+        client=qdrant_client
     )
 
     print(f"[DEBUG] Stored {len(langchain_docs)} chunks into Qdrant.")
