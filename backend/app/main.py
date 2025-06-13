@@ -65,6 +65,12 @@ def test_embedding():
     num_chunks = process_and_store_text("test_doc.pdf", text_by_page)
     return {"status": "success", "chunks_stored": num_chunks}
 
+
+#  Include main routers
+app.include_router(query.router)
+app.include_router(documents.router)
+
+
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """
@@ -77,10 +83,3 @@ def read_root():
         </body>
     </html>
     """
-
-
-#  Include main routers
-app.include_router(query.router)
-app.include_router(documents.router)
-
-
