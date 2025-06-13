@@ -1,53 +1,139 @@
+📚 Document Theme Chatbot – Wasserstoff Gen-AI Internship Task
+This project is a document research and theme identification chatbot built for the Wasserstoff Generative AI Internship Qualification Task. It allows users to upload documents (PDF, scanned images, text), ask questions in natural language, and receive cited answers and theme-based summaries using LLMs and vector search.
 
-# 🧠 Document Theme Chatbot (Wasserstoff Gen-AI Internship Project)
+🔍 Features
+✅ Core Functionality
+Upload 75+ documents (PDFs, scans, text)
 
-An AI-powered document research chatbot that lets you upload multiple documents, ask natural language questions, get document-wise answers with citations, and see synthesized themes across documents — all in a clean chat-style interface.
+OCR support for scanned image PDFs using PyMuPDF + optional fallback
 
----
+Chunking + Embedding with LangChain + MiniLM and storage in Qdrant
 
-## 🚀 Features
+Ask natural questions – semantic search returns relevant text chunks
 
-### 📁 Upload & Ingest Documents
-- Supports **PDFs**, **image scans (with OCR)**, and **text** files.
-- Automatic **text extraction**, **chunking**, and **semantic embedding** using `MiniLM`.
-- Stores chunks in **Qdrant** vector database.
+Document-level answers – with citations (Document ID, Page, Chunk)
 
-### 🔍 Ask Natural Language Questions
-- Users can ask any question.
-- The system:
-  - Searches each document for relevant chunks.
-  - Returns **document-wise answers** with page + chunk citations.
-  - Generates a **theme summary** that synthesizes insights from top results.
+Theme-based summarization – synthesized LLM summary grouped by theme
 
-### 🗂️ Smart UI for Querying
-- Filters: Document type, upload date, exclusion list, and sort by relevance/newest/oldest.
-- Sidebar lets users exclude documents **per query**.
-- Results appear in a familiar **chat format**.
-- Includes **chunk-level citation highlighting and modals**.
+Filters: by date, document type, exclusion list, sort order
 
-### ✅ Extra Features (for extra credit)
-- Paragraph/chunk-level citations: `[DOC001, Page 4, Chunk 2]`
-- Document filters + exclusion are dynamic.
-- UI shows only matched documents in filter sidebar (just like ChatGPT).
-- Popup notifications for upload progress and success.
-- Option to **Clear Chat**.
-- Latest messages appear closest to input field.
+🎯 Extra Credit Implemented
+✅ Paragraph/Chunk-level citation (e.g., Page 3, Chunk 2)
 
----
+✅ Clickable citations in chat (modal view)
 
-## 🛠️ Tech Stack
+✅ Filter by matched docs only
 
-| Layer       | Tech Used |
-|-------------|-----------|
-| Frontend    | Next.js, Tailwind CSS, Lucide, TypeScript |
-| Backend     | FastAPI (Python), LangChain, HuggingFace, Groq (LLM) |
-| Vector DB   | Qdrant |
-| OCR         | PyMuPDF / PaddleOCR (for image-based PDFs) |
-| LLM         | Groq (LLaMA3-8B) |
-| Embeddings  | `sentence-transformers/all-MiniLM-L6-v2` |
-| Deployment  | Localhost / Railway / HuggingFace (flexible) |
+✅ Re-run query on selected subset of docs
 
----
+✅ Sidebar filters: exclude, sort by relevance/date
 
-## 🧠 Architecture
+✅ Modern assistant-style chat UI with:
+
+Upload & loading states
+
+Clear chat option
+
+LocalStorage chat history
+
+Newest message appears near input bar (like ChatGPT)
+
+🧠 Tech Stack
+Layer	Tooling
+Frontend	Next.js 14 + Tailwind CSS
+Backend	FastAPI
+LLM	Groq + LLaMA 3 (8B)
+Embeddings	HuggingFace MiniLM
+Vector DB	Qdrant
+OCR	PyMuPDF (fitz)
+Deployment	(Local Dev) – Easily deployable on Hugging Face, Render, Railway
+
+🧪 How It Works
+Document Upload
+
+Extracts text from each page.
+
+Splits into overlapping chunks.
+
+Embeds using HuggingFace MiniLM.
+
+Stores with metadata in Qdrant.
+
+Asking a Question
+
+Question is embedded and searched in Qdrant.
+
+Top-k chunks are retrieved (filtered by user criteria).
+
+Each chunk is cited (DOC ID, Page, Chunk).
+
+A Groq LLaMA-3 model summarizes the top chunks into themes.
+
+Frontend Display
+
+Shows individual document answers (tabular).
+
+Theme summary in chat format.
+
+Clickable citation links to view source chunk.
+
+Sidebar filters and exclusions applied dynamically.
+
+📦 Project Structure
+mathematica
+Copy
+Edit
+chatbot-theme-identifier/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── query.py         ← Main QA logic
+│   │   │   ├── query_filters.py ← Filtering logic
+│   │   │   └── documents.py     ← List uploaded docs
+│   │   ├── services/
+│   │   │   ├── text_extractor.py
+│   │   │   └── embedding_pipeline.py
+│   │   └── main.py              ← FastAPI entrypoint
+├── frontend/ (Next.js project)
+│   └── app/index/page.tsx      ← Core UI
+├── data/                       ← Optional: sample docs
+└── README.md
+🚀 Running Locally
+1. Clone + Install
+bash
+Copy
+Edit
+git clone https://github.com/yourname/document-theme-chatbot
+cd document-theme-chatbot/backend
+pip install -r requirements.txt
+2. Start Backend
+bash
+Copy
+Edit
+# Start Qdrant
+docker run -p 6333:6333 -v $(pwd)/qdrant_storage:/qdrant/storage qdrant/qdrant
+
+# Start FastAPI
+uvicorn app.main:app --reload
+3. Start Frontend (Next.js)
+bash
+Copy
+Edit
+cd frontend
+npm install
+npm run dev
+🎥 Demo Preview
+📄 Upload documents
+
+🧠 Ask “What is the main topic discussed?”
+
+📌 See:
+
+Per-document citations
+
+Synthesized theme answers
+
+Filter, re-run, clear history
+
+Document match map
 
