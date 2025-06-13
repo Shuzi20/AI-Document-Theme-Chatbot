@@ -1,37 +1,30 @@
-# ✅ CHUNKING + EMBEDDING + QDRANT STORAGE (LangChain + Qdrant Cloud)
-
 import os
 import uuid
 from datetime import datetime
-from langchain_core.documents import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Qdrant
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
 
-# 🔧 Load from Environment Variables (Cloud-Safe)
-QDRANT_HOST = os.getenv("QDRANT_HOST")  # e.g. https://your-cluster.aws.cloud.qdrant.io
+# ✅ Only keep lightweight modules at top
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+
+# 🔧 Load from Environment Variables
+QDRANT_HOST = os.getenv("QDRANT_HOST")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents_collection")
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # small and cloud-safe
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-# ✅ Lazy-loaded embedding model
+# ✅ Lazy import inside function
 def get_embedding_model():
+    from langchain_community.embeddings import HuggingFaceEmbeddings
     return HuggingFaceEmbeddings(model_name=MODEL_NAME)
 
-# ✅ Lazy-loaded Qdrant client
 def get_qdrant_client():
-    return QdrantClient(
-        url=QDRANT_HOST,
-        api_key=QDRANT_API_KEY
-    )
+    from qdrant_client import QdrantClient
+    return QdrantClient(url=QDRANT_HOST, api_key=QDRANT_API_KEY)
 
-# ✅ Create collection if it doesn’t exist
 def create_qdrant_collection():
+    from qdrant_client.models import VectorParams, Distance
     client = get_qdrant_client()
     model = get_embedding_model()
-
     if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:
         client.create_collection(
             collection_name=COLLECTION_NAME,
@@ -41,7 +34,6 @@ def create_qdrant_collection():
             )
         )
 
-# 🔍 Simple type inference from filename
 def infer_doc_type(filename: str):
     name = filename.lower()
     if "legal" in name:
@@ -52,8 +44,9 @@ def infer_doc_type(filename: str):
         return "policy"
     return "other"
 
-# ✅ Full pipeline to process & embed document
 def process_and_store_text(document_name, text_by_page):
+    from langchain_community.vectorstores import Qdrant
+
     client = get_qdrant_client()
     model = get_embedding_model()
     create_qdrant_collection()
@@ -65,9 +58,7 @@ def process_and_store_text(document_name, text_by_page):
     flat_doc_name = document_name.strip().lower()
 
     for page, text in text_by_page.items():
-        print(f"[DEBUG] Splitting text from {document_name} - Page {page}")
         chunks = splitter.split_text(text)
-        print(f"[DEBUG] {len(chunks)} chunks from Page {page}")
         for idx, chunk in enumerate(chunks):
             documents.append({
                 "id": str(uuid.uuid4()),
@@ -81,10 +72,7 @@ def process_and_store_text(document_name, text_by_page):
                 }
             })
 
-    print(f"[DEBUG] Total chunks to store: {len(documents)}")
-
     if not documents:
-        print("[WARNING] No chunks created. Possible OCR failure or empty document.")
         return 0
 
     langchain_docs = [
@@ -95,7 +83,6 @@ def process_and_store_text(document_name, text_by_page):
         for doc in documents
     ]
 
-    # ✅ Store documents in Qdrant Cloud
     Qdrant.from_documents(
         documents=langchain_docs,
         embedding=model,
@@ -103,5 +90,4 @@ def process_and_store_text(document_name, text_by_page):
         client=client
     )
 
-    print(f"[DEBUG] Stored {len(langchain_docs)} chunks into Qdrant.")
     return len(langchain_docs)
