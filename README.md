@@ -124,6 +124,52 @@ npm run dev
 
 App runs at http://localhost:3000 and connects to backend on http://localhost:8000
 
+✅ Setup via Docker 
+To run Qdrant locally without manual installation, use the included docker-compose.yml.
+
+1️⃣ Add docker-compose.yml at the project root:
+yaml
+Copy
+Edit
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+This will:
+
+Pull the official Qdrant image
+
+Expose it on localhost:6333
+
+Mount a local qdrant_storage/ directory to persist vector data
+
+2️⃣ Create storage folder (optional)
+bash
+Copy
+Edit
+mkdir qdrant_storage
+3️⃣ Start Qdrant service
+bash
+Copy
+Edit
+docker-compose up -d
+4️⃣ Confirm it’s running
+Visit: http://localhost:6333
+
+Your FastAPI backend connects automatically using:
+
+python
+Copy
+Edit
+QdrantClient(host="localhost", port=6333)
+
+
 🎥 Demo Preview
 📝 Upload documents
 Drag and drop PDFs or images (OCR supported)
