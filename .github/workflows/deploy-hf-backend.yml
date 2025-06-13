@@ -23,3 +23,4 @@ jobs:
           git add .
           git commit -m "Auto deploy from GitHub" || echo "No changes to commit"
           git push https://${{ secrets.HF_TOKEN }}@huggingface.co/spaces/${{ secrets.HF_USERNAME }}/${{ secrets.SPACE_NAME }} main
+
