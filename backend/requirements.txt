@@ -1,9 +1,9 @@
-# FastAPI + Server
+# FastAPI backend
 fastapi==0.110.1
 uvicorn[standard]==0.29.0
 python-dotenv==1.0.1
 
-# Vector store + embeddings
+# Vector store + Embeddings
 qdrant-client==1.8.0
 langchain==0.1.16
 langchain-community==0.0.32
@@ -13,16 +13,19 @@ transformers==4.41.1
 torch==2.3.0
 
 # Groq LLM client
-groq==0.3.0
+groq>=0.28.0
 
-
-# PDF/image parsing
+# OCR & PDF
 pdfplumber==0.10.3
-Pillow==10.3.0
 pytesseract==0.3.10
+Pillow==10.3.0
 
-# Tokenizer utilities
+# Tokenizer
 tiktoken==0.6.0
+
+# gRPC-related
+grpcio==1.64.0
+grpcio-tools==1.73.0
 
 # Utility
 regex
