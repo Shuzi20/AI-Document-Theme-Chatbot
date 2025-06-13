@@ -12,8 +12,14 @@ RUN apt-get update && apt-get install -y \
 
 # --- Setup app directory ---
 WORKDIR /app
-ENV TRANSFORMERS_CACHE=/app/cache
-RUN mkdir -p /app/cache && chmod -R 777 /app/cache
+
+# ✅ Set cache environment variables for HF model downloads
+ENV TRANSFORMERS_CACHE=/app/.hf_cache
+ENV HF_HOME=/app/.hf_cache
+
+# ✅ Create writable cache directory
+RUN mkdir -p /app/.hf_cache && chmod -R 777 /app/.hf_cache
+
 # --- Install Python dependencies ---
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
