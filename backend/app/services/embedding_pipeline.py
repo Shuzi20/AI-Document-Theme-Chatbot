@@ -1,24 +1,24 @@
-# ✅ CHUNKING + EMBEDDING + QDRANT STORAGE (LangChain + Qdrant Cloud)
+# ✅ CHUNKING + EMBEDDING + QDRANT STORAGE (LangChain + Qdrant Cloud via Groq)
 
 import os
 import uuid
 from datetime import datetime
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain.embeddings import OpenAIEmbeddings  # ✅ Groq-compatible
 from langchain_community.vectorstores import Qdrant
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
-# 🔧 Load from Environment Variables (Cloud-Safe)
-QDRANT_HOST = os.getenv("QDRANT_HOST")  # e.g. https://your-cluster.aws.cloud.qdrant.io
+# 🔧 Load from Environment Variables
+QDRANT_HOST = os.getenv("QDRANT_HOST")  # e.g. https://your-cluster.cloud.qdrant.io
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents_collection")
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # small and cloud-safe
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# ✅ Lazy-loaded embedding model
+# ✅ Lazy-loaded embedding model using Groq (via OpenAI-compatible API)
 def get_embedding_model():
-    return HuggingFaceEmbeddings(model_name=MODEL_NAME)
+    return OpenAIEmbeddings(openai_api_key=GROQ_API_KEY)
 
 # ✅ Lazy-loaded Qdrant client
 def get_qdrant_client():
