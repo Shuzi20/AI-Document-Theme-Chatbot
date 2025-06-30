@@ -18,7 +18,9 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # ✅ Lazy-loaded embedding model using Groq (via OpenAI-compatible API)
 def get_embedding_model():
-    return OpenAIEmbeddings(openai_api_key=GROQ_API_KEY)
+    return OpenAIEmbeddings(
+        openai_api_key=GROQ_API_KEY,
+        openai_api_base="https://api.groq.com/openai/v1"
 
 # ✅ Lazy-loaded Qdrant client
 def get_qdrant_client():
