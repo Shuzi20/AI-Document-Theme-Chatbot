@@ -10,15 +10,19 @@ import tiktoken
 from uuid import uuid4
 from datetime import datetime
 
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.embeddings import OpenAIEmbeddings  # ✅ Groq-compatible
 from langchain_community.vectorstores import Qdrant as QdrantStore
-from app.api.query_filters import build_query_filter  # ✅ <-- imported here
+from app.api.query_filters import build_query_filter  # ✅ custom filter logic
 
 load_dotenv()
 
 router = APIRouter()
 
-embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embedding_model = OpenAIEmbeddings(
+    openai_api_key=os.getenv("GROQ_API_KEY"),
+    openai_api_base="https://api.groq.com/openai/v1"
+)
+
 qdrant_client = QdrantClient(host="localhost", port=6333)
 
 qdrant = QdrantStore(
@@ -35,7 +39,7 @@ class QueryRequest(BaseModel):
     excluded_docs: List[str] = []
     sort_by: Literal["relevance", "newest", "oldest"] = "relevance"
     doc_type: str = None
-    date_after: str = None  # ISO format (e.g., "2025-06-01")
+    date_after: str = None
     date_before: str = None
 
 @router.post("/ask")
@@ -59,10 +63,6 @@ def ask_question(payload: QueryRequest):
             with_payload=True,
             query_filter=filter_conditions
         )
-
-        for r in search_result:
-            print("[DEBUG] Payload sample:", r.payload)
-        print(f"[DEBUG] Retrieved {len(search_result)} results after filtering")
 
         if not search_result:
             return {
@@ -124,7 +124,6 @@ def ask_question(payload: QueryRequest):
 
         for chunk in top_chunks:
             if not chunk.get("text") or not chunk["text"].strip():
-                print("[SKIP] Empty or invalid chunk:", chunk)
                 continue
 
             formatted = f"[{chunk['doc_id']}, Page {chunk['page']}, Chunk {chunk['chunk_index']}] {chunk['text']}"
@@ -135,8 +134,6 @@ def ask_question(payload: QueryRequest):
 
             final_chunks.append(formatted)
             total_tokens += token_count
-
-        print(f"[DEBUG] Final chunks for theme summary: {len(final_chunks)}")
 
         if not final_chunks:
             return {
