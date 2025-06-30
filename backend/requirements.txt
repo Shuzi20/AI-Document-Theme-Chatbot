@@ -1,24 +1,21 @@
-# FastAPI backend
+# Backend API
 fastapi==0.110.1
 uvicorn[standard]==0.29.0
 python-dotenv==1.0.1
 python-multipart==0.0.9
 
-# Vector store + Embeddings (required)
+# Core vector + LLM
 qdrant-client==1.8.0
 langchain==0.1.16
-langchain-community==0.0.32
-langchain-huggingface==0.0.3
+langchain-huggingface==0.0.3  # lightweight wrapper
+groq==0.28.0  # for Groq LLM completion
 
-# Groq LLM client
-groq==0.28.0  # ✅ needed for chat completion
-
-# OCR & PDF — lightweight OCR
+# OCR + PDF
 pdfplumber==0.10.3
 pytesseract==0.3.10
 Pillow==10.3.0
 
-# Tokenizer (used with tiktoken)
+# Tokenization (theme summarization)
 tiktoken==0.6.0
 
 # Utilities
