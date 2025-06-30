@@ -4,25 +4,22 @@ uvicorn[standard]==0.29.0
 python-dotenv==1.0.1
 python-multipart==0.0.9
 
-# Vector store + Embeddings
+# Vector store + Embeddings (required)
 qdrant-client==1.8.0
 langchain==0.1.16
 langchain-community==0.0.32
 langchain-huggingface==0.0.3
 
 # Groq LLM client
-groq==0.28.0   # ✅ pin version for stability
+groq==0.28.0  # ✅ needed for chat completion
 
-# OCR & PDF
+# OCR & PDF — lightweight OCR
 pdfplumber==0.10.3
 pytesseract==0.3.10
 Pillow==10.3.0
 
-# Tokenizer
+# Tokenizer (used with tiktoken)
 tiktoken==0.6.0
 
-# gRPC tools
-grpcio-tools==1.73.0
-
-# Utility
+# Utilities
 regex
