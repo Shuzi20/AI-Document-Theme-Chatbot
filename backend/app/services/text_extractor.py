@@ -5,26 +5,26 @@ from PIL import Image
 import pytesseract
 import pdfplumber
 
+# ✅ SAFE: Try to detect tesseract, skip if not found (Replit case)
+TESSERACT_AVAILABLE = shutil.which("tesseract") or Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe").exists()
 
-# 🔧 Try dynamic detection or fallback to default install location
-pytesseract.pytesseract.tesseract_cmd = (
-    shutil.which("tesseract") or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if TESSERACT_AVAILABLE:
+    pytesseract.pytesseract.tesseract_cmd = (
+        shutil.which("tesseract") or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 )
-
-# 🛡️ Optional: verify it actually works
-if not shutil.which("tesseract") and not Path(pytesseract.pytesseract.tesseract_cmd).exists():
-    raise EnvironmentError("❌ Tesseract OCR is not installed or not found in system PATH.")
-
+else:
+    print("⚠️ Warning: Tesseract not found — image OCR will be skipped.")
 
 def extract_text_from_file(filename, content_bytes):
     extension = filename.split(".")[-1].lower()
     if extension == "pdf":
         return extract_text_from_pdf(content_bytes)
     elif extension in ["png", "jpg", "jpeg"]:
+        if not TESSERACT_AVAILABLE:
+            return {}, {"error": "Tesseract not installed — OCR not supported in this environment."}
         return extract_text_from_image(content_bytes)
     else:
         return {}, {"error": "Unsupported file type"}
-
 
 def extract_text_from_pdf(file_bytes):
     page_dict = {}
@@ -39,8 +39,6 @@ def extract_text_from_pdf(file_bytes):
                 meta[page_num] = len(page_text)
 
     return page_dict, meta
-
-
 
 def extract_text_from_image(image_bytes):
     image = Image.open(io.BytesIO(image_bytes))
