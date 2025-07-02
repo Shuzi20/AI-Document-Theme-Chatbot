@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from qdrant_client import QdrantClient
 from typing import List
-
+from app.services.embedding_pipeline import get_qdrant_client
 router = APIRouter()
 
-qdrant_client = QdrantClient(host="localhost", port=6333)
+qdrant_client = get_qdrant_client()
 COLLECTION_NAME = "documents_collection"
 
 @router.get("/documents", response_model=List[str])
