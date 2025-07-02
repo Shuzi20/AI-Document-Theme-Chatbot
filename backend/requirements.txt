@@ -19,3 +19,4 @@ tiktoken==0.6.0
 
 # Utility
 regex
+openai==1.30.1
