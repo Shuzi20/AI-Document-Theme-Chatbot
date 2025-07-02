@@ -13,18 +13,18 @@ from datetime import datetime
 from langchain_openai import OpenAIEmbeddings  # ✅ Groq-compatible
 from langchain_community.vectorstores import Qdrant as QdrantStore
 from app.api.query_filters import build_query_filter  # ✅ custom filter logic
+from app.services.embedding_pipeline import get_qdrant_client  # ✅ Qdrant cloud
 
 load_dotenv()
 
 router = APIRouter()
 
-os.environ["OPENAI_API_KEY"] = os.getenv("GROQ_API_KEY")
-os.environ["OPENAI_API_BASE"] = "https://api.groq.com/openai/v1"
+embedding_model = OpenAIEmbeddings(
+    openai_api_key=os.getenv("GROQ_API_KEY"),
+    openai_api_base="https://api.groq.com/openai/v1"
+)
 
-embedding_model = OpenAIEmbeddings()
-
-
-qdrant_client = QdrantClient(host="localhost", port=6333)
+qdrant_client = get_qdrant_client()
 
 qdrant = QdrantStore(
     client=qdrant_client,
@@ -46,7 +46,6 @@ class QueryRequest(BaseModel):
 @router.post("/ask")
 def ask_question(payload: QueryRequest):
     try:
-        # ✅ Build advanced filters
         filter_conditions = build_query_filter(
             excluded_docs=payload.excluded_docs,
             doc_type=payload.doc_type,
