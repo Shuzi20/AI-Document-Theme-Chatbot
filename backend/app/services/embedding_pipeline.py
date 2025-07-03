@@ -109,13 +109,20 @@ def process_and_store_text(document_name, text_by_page):
     if langchain_docs:
         print(f"[DEBUG] First chunk for embedding: {langchain_docs[0].page_content[:100]}")
 
-    # ✅ Store documents in Qdrant Cloud
-    Qdrant.from_documents(
-        documents=langchain_docs,
-        embedding=model,
+    # ✅ Extract raw text + metadata explicitly and use lower-level add_texts
+    texts = [doc.page_content for doc in langchain_docs if isinstance(doc.page_content, str)]
+    metadatas = [doc.metadata for doc in langchain_docs]
+
+    qdrant = Qdrant(
+        client=client,
         collection_name=COLLECTION_NAME,
-        client=client
+        embeddings=model
     )
 
-    print(f"[DEBUG] Stored {len(langchain_docs)} chunks into Qdrant.")
-    return len(langchain_docs)
+    qdrant.add_texts(
+        texts=texts,
+        metadatas=metadatas
+    )
+
+    print(f"[DEBUG] Stored {len(texts)} chunks into Qdrant.")
+    return len(texts)
