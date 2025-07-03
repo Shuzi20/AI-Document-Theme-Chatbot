@@ -10,7 +10,7 @@ import tiktoken
 from uuid import uuid4
 from datetime import datetime
 
-from langchain_openai import OpenAIEmbeddings  # ✅ Groq-compatible
+from langchain_openai import OpenAIEmbeddings  
 from langchain_community.vectorstores import Qdrant as QdrantStore
 from app.api.query_filters import build_query_filter  # ✅ custom filter logic
 from app.services.embedding_pipeline import get_qdrant_client  # ✅ Qdrant cloud

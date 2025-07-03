@@ -11,7 +11,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
 # 🔧 Load from Environment Variables
-QDRANT_HOST = os.getenv("QDRANT_HOST")  # e.g. https://your-cluster.cloud.qdrant.io
+QDRANT_HOST = os.getenv("QDRANT_HOST") 
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents_collection")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -90,13 +90,19 @@ def process_and_store_text(document_name, text_by_page):
         print("[WARNING] No chunks created. Possible OCR failure or empty document.")
         return 0
 
+    # ✅ Filter only valid text chunks to avoid OpenAI 400 error
     langchain_docs = [
         Document(
             page_content=doc["text"],
             metadata=doc["metadata"]
         )
         for doc in documents
+        if isinstance(doc["text"], str) and doc["text"].strip()
     ]
+
+    print(f"[DEBUG] Valid chunks to embed: {len(langchain_docs)}")
+    if langchain_docs:
+        print("[DEBUG] Sample chunk:", langchain_docs[0].page_content[:100])
 
     # ✅ Store documents in Qdrant Cloud
     Qdrant.from_documents(
