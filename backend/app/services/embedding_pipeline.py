@@ -109,9 +109,20 @@ def process_and_store_text(document_name, text_by_page):
     if langchain_docs:
         print(f"[DEBUG] First chunk for embedding: {langchain_docs[0].page_content[:100]}")
 
-    # ✅ Extract raw text + metadata explicitly and use lower-level add_texts
-    texts = [doc.page_content for doc in langchain_docs if isinstance(doc.page_content, str)]
-    metadatas = [doc.metadata for doc in langchain_docs]
+    # ✅ Extract raw text + metadata and sanitize inputs
+    texts = []
+    for doc in langchain_docs:
+        raw = doc.page_content
+        if not isinstance(raw, str):
+            continue
+        cleaned = raw.strip().replace("\n", " ").replace("\r", " ").strip()
+        if cleaned:
+            texts.append(cleaned)
+
+    metadatas = [doc.metadata for doc in langchain_docs][:len(texts)]
+
+    print(f"[DEBUG] Final embedding input preview: {texts[:1]}")
+    print(f"[DEBUG] Embedding {len(texts)} texts...")
 
     qdrant = Qdrant(
         client=client,
