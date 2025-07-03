@@ -113,11 +113,19 @@ def process_and_store_text(document_name, text_by_page):
     texts = []
     for doc in langchain_docs:
         raw = doc.page_content
+
         if not isinstance(raw, str):
+            print(f"[WARNING] Skipped non-string content: {type(raw)}")
             continue
-        cleaned = raw.strip().replace("\n", " ").replace("\r", " ").strip()
-        if cleaned:
-            texts.append(cleaned)
+
+        cleaned = str(raw).replace("\n", " ").replace("\r", " ").strip()
+
+        if not cleaned or not isinstance(cleaned, str):
+            print(f"[WARNING] Skipped empty or invalid cleaned chunk: {repr(raw)}")
+            continue
+
+        texts.append(cleaned)
+
 
     metadatas = [doc.metadata for doc in langchain_docs][:len(texts)]
 
