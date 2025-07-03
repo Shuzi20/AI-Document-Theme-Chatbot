@@ -90,19 +90,24 @@ def process_and_store_text(document_name, text_by_page):
         print("[WARNING] No chunks created. Possible OCR failure or empty document.")
         return 0
 
-    # ✅ Filter only valid text chunks to avoid OpenAI 400 error
-    langchain_docs = [
-        Document(
-            page_content=doc["text"],
-            metadata=doc["metadata"]
+    # ✅ Final safe conversion: only valid non-empty strings go into embedding
+    langchain_docs = []
+    for doc in documents:
+        text = doc.get("text", "")
+        if isinstance(text, str):
+            text = text.strip()
+        if not text:
+            continue
+        langchain_docs.append(
+            Document(
+                page_content=text,
+                metadata=doc["metadata"]
+            )
         )
-        for doc in documents
-        if isinstance(doc["text"], str) and doc["text"].strip()
-    ]
 
-    print(f"[DEBUG] Valid chunks to embed: {len(langchain_docs)}")
+    print(f"[DEBUG] Valid langchain_docs: {len(langchain_docs)}")
     if langchain_docs:
-        print("[DEBUG] Sample chunk:", langchain_docs[0].page_content[:100])
+        print(f"[DEBUG] First chunk for embedding: {langchain_docs[0].page_content[:100]}")
 
     # ✅ Store documents in Qdrant Cloud
     Qdrant.from_documents(
