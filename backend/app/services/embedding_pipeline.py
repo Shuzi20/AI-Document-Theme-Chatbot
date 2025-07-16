@@ -59,7 +59,7 @@ def infer_doc_type(filename: str):
 # ✅ Full pipeline to process & embed document
 def process_and_store_text(document_name, text_by_page):
     client = get_qdrant_client()
-    model = get_embedding_model()
+    embedding_model = get_embedding_model()
     create_qdrant_collection()
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
@@ -69,13 +69,11 @@ def process_and_store_text(document_name, text_by_page):
     flat_doc_name = document_name.strip().lower()
 
     for page, text in text_by_page.items():
-        print(f"[DEBUG] Splitting text from {document_name} - Page {page}")
         chunks = splitter.split_text(text)
-        print(f"[DEBUG] {len(chunks)} chunks from Page {page}")
         for idx, chunk in enumerate(chunks):
             documents.append({
                 "id": str(uuid.uuid4()),
-                "text": chunk,
+                "text": chunk.strip(),
                 "metadata": {
                     "doc_name": flat_doc_name,
                     "doc_type": infer_doc_type(flat_doc_name),
@@ -85,64 +83,36 @@ def process_and_store_text(document_name, text_by_page):
                 }
             })
 
-    print(f"[DEBUG] Total chunks to store: {len(documents)}")
+    valid_docs = [doc for doc in documents if doc["text"]]
+    texts = [doc["text"] for doc in valid_docs]
+    metadatas = [doc["metadata"] for doc in valid_docs]
 
-    if not documents:
-        print("[WARNING] No chunks created. Possible OCR failure or empty document.")
+    if not texts:
+        print("[WARNING] No valid texts to embed.")
         return 0
 
-    # ✅ Final safe conversion: only valid non-empty strings go into embedding
-    langchain_docs = []
-    for doc in documents:
-        text = doc.get("text", "")
-        if isinstance(text, str):
-            text = text.strip()
-        if not text:
-            continue
-        langchain_docs.append(
-            Document(
-                page_content=text,
-                metadata=doc["metadata"]
-            )
-        )
-
-    print(f"[DEBUG] Valid langchain_docs: {len(langchain_docs)}")
-    if langchain_docs:
-        print(f"[DEBUG] First chunk for embedding: {langchain_docs[0].page_content[:100]}")
-
-    # ✅ Extract raw text + metadata and sanitize inputs
-    texts = []
-    for doc in langchain_docs:
-        raw = doc.page_content
-
-        if not isinstance(raw, str):
-            print(f"[WARNING] Skipped non-string content: {type(raw)}")
-            continue
-
-        cleaned = str(raw).replace("\n", " ").replace("\r", " ").strip()
-
-        if not cleaned or not isinstance(cleaned, str):
-            print(f"[WARNING] Skipped empty or invalid cleaned chunk: {repr(raw)}")
-            continue
-
-        texts.append(cleaned)
-
-
-    metadatas = [doc.metadata for doc in langchain_docs][:len(texts)]
-
-    print(f"[DEBUG] Final embedding input preview: {texts[:1]}")
     print(f"[DEBUG] Embedding {len(texts)} texts...")
 
-    qdrant = Qdrant(
-        client=client,
+    # 🔔 Explicit manual embedding here (bypass Qdrant.add_texts)
+    embeddings = embedding_model.embed_documents(texts)
+    print(f"[DEBUG] Got {len(embeddings)} embeddings.")
+
+    # ✅ Manual upsert to Qdrant
+    points = []
+    for doc, vector in zip(valid_docs, embeddings):
+        points.append({
+            "id": doc["id"],
+            "vector": vector,
+            "payload": {
+                "page_content": doc["text"],
+                "metadata": doc["metadata"]
+            }
+        })
+
+    client.upsert(
         collection_name=COLLECTION_NAME,
-        embeddings=model
+        points=points
     )
 
-    qdrant.add_texts(
-        texts=texts,
-        metadatas=metadatas
-    )
-
-    print(f"[DEBUG] Stored {len(texts)} chunks into Qdrant.")
-    return len(texts)
+    print(f"[DEBUG] Stored {len(points)} chunks into Qdrant manually.")
+    return len(points)
