@@ -9,29 +9,17 @@ from dotenv import load_dotenv
 import tiktoken
 from uuid import uuid4
 from datetime import datetime
+from sentence_transformers import SentenceTransformer
 
-from langchain_openai import OpenAIEmbeddings  
-from langchain_community.vectorstores import Qdrant as QdrantStore
-from app.api.query_filters import build_query_filter  # ✅ custom filter logic
-from app.services.embedding_pipeline import get_qdrant_client  # ✅ Qdrant cloud
+from app.api.query_filters import build_query_filter
+from app.services.embedding_pipeline import get_qdrant_client
 
 load_dotenv()
 
 router = APIRouter()
 
-embedding_model = OpenAIEmbeddings(
-    openai_api_key=os.getenv("GROQ_API_KEY"),
-    openai_api_base="https://api.groq.com/openai/v1"
-)
-
 qdrant_client = get_qdrant_client()
-
-qdrant = QdrantStore(
-    client=qdrant_client,
-    collection_name="documents_collection",
-    embeddings=embedding_model
-)
-
+embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 class QueryRequest(BaseModel):
@@ -53,7 +41,8 @@ def ask_question(payload: QueryRequest):
             date_before=payload.date_before
         )
 
-        embedded_query = embedding_model.embed_query(payload.question)
+        # ✅ Use SentenceTransformer locally for embedding the query
+        embedded_query = embedding_model.encode(payload.question, normalize_embeddings=True).tolist()
 
         search_result = qdrant_client.search(
             collection_name="documents_collection",
