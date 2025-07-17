@@ -1,58 +1,51 @@
-# ✅ CHUNKING + EMBEDDING + QDRANT STORAGE (Direct Groq API call)
+# ✅ CHUNKING + EMBEDDING + QDRANT STORAGE (LangChain + Qdrant Cloud via Groq)
 
 import os
 import uuid
 from datetime import datetime
+from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import Qdrant
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
-import httpx
 
 # 🔧 Load from Environment Variables
 QDRANT_HOST = os.getenv("QDRANT_HOST") 
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents_collection")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_EMBEDDING_MODEL = "text-embedding-3-small"
 
+# ✅ Lazy-loaded embedding model using Groq (via OpenAI-compatible API)
+def get_embedding_model():
+    return OpenAIEmbeddings(
+        model="text-embedding-3-small",
+        openai_api_key=GROQ_API_KEY,
+        openai_api_base="https://api.groq.com/openai/v1"
+    )    
+
+# ✅ Lazy-loaded Qdrant client
 def get_qdrant_client():
     return QdrantClient(
         url=QDRANT_HOST,
         api_key=QDRANT_API_KEY
     )
 
-def get_groq_embeddings(texts: list[str], api_key: str, model: str = GROQ_EMBEDDING_MODEL):
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": model,
-        "input": texts
-    }
-    response = httpx.post(
-        "https://api.groq.com/openai/v1/embeddings",
-        headers=headers,
-        json=payload
-    )
-    response.raise_for_status()
-    data = response.json()
-    return [r["embedding"] for r in data["data"]]
-
+# ✅ Create collection if it doesn’t exist
 def create_qdrant_collection():
     client = get_qdrant_client()
-    test_vector = get_groq_embeddings(["test"], GROQ_API_KEY)[0]
-    vector_size = len(test_vector)
+    model = get_embedding_model()
 
     if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:
         client.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(
-                size=vector_size,
+                size=len(model.embed_query("test")),
                 distance=Distance.COSINE
             )
         )
 
+# 🔍 Simple type inference from filename
 def infer_doc_type(filename: str):
     name = filename.lower()
     if "legal" in name:
@@ -63,8 +56,10 @@ def infer_doc_type(filename: str):
         return "policy"
     return "other"
 
+# ✅ Full pipeline to process & embed document
 def process_and_store_text(document_name, text_by_page):
     client = get_qdrant_client()
+    embedding_model = get_embedding_model()
     create_qdrant_collection()
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
@@ -90,6 +85,7 @@ def process_and_store_text(document_name, text_by_page):
 
     valid_docs = [doc for doc in documents if doc["text"]]
     texts = [doc["text"] for doc in valid_docs]
+    metadatas = [doc["metadata"] for doc in valid_docs]
 
     if not texts:
         print("[WARNING] No valid texts to embed.")
@@ -97,9 +93,11 @@ def process_and_store_text(document_name, text_by_page):
 
     print(f"[DEBUG] Embedding {len(texts)} texts...")
 
-    embeddings = get_groq_embeddings(texts, GROQ_API_KEY)
+    # 🔔 Explicit manual embedding here (bypass Qdrant.add_texts)
+    embeddings = embedding_model.embed_documents(texts)
     print(f"[DEBUG] Got {len(embeddings)} embeddings.")
 
+    # ✅ Manual upsert to Qdrant
     points = []
     for doc, vector in zip(valid_docs, embeddings):
         points.append({
