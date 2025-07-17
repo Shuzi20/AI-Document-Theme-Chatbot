@@ -9,30 +9,18 @@ from dotenv import load_dotenv
 import tiktoken
 from uuid import uuid4
 from datetime import datetime
-
-from langchain_openai import OpenAIEmbeddings  
-from langchain_community.vectorstores import Qdrant as QdrantStore
-from app.api.query_filters import build_query_filter  # ✅ custom filter logic
-from app.services.embedding_pipeline import get_qdrant_client  # ✅ Qdrant cloud
+from app.api.query_filters import build_query_filter
+from app.services.embedding_pipeline import get_qdrant_client, get_groq_embeddings
 
 load_dotenv()
 
 router = APIRouter()
 
-embedding_model = OpenAIEmbeddings(
-    openai_api_key=os.getenv("GROQ_API_KEY"),
-    openai_api_base="https://api.groq.com/openai/v1"
-)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_EMBEDDING_MODEL = "text-embedding-3-small"
 
 qdrant_client = get_qdrant_client()
-
-qdrant = QdrantStore(
-    client=qdrant_client,
-    collection_name="documents_collection",
-    embeddings=embedding_model
-)
-
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 class QueryRequest(BaseModel):
     question: str
@@ -53,7 +41,7 @@ def ask_question(payload: QueryRequest):
             date_before=payload.date_before
         )
 
-        embedded_query = embedding_model.embed_query(payload.question)
+        embedded_query = get_groq_embeddings([payload.question], GROQ_API_KEY)[0]
 
         search_result = qdrant_client.search(
             collection_name="documents_collection",
