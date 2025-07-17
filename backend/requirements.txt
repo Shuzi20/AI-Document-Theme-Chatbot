@@ -21,3 +21,4 @@ regex
 
 # Embeddings (local)
 sentence-transformers==2.2.2
+langchain==0.1.16
