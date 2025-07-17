@@ -22,3 +22,4 @@ regex
 # Embeddings (local)
 sentence-transformers==2.2.2
 langchain==0.1.16
+huggingface_hub==0.19.4
